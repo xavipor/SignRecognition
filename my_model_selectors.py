@@ -67,8 +67,9 @@ class SelectorBIC(ModelSelector):
     http://www2.imm.dtu.dk/courses/02433/doc/ch6_slides.pdf
     Bayesian information criteria: BIC = -2 * logL + p * logN
     """
-
+    warnings.filterwarnings("ignore", category=RuntimeWarning)
     def select(self):
+        
         """ select the best model for self.this_word based on
         BIC score for n between self.min_n_components and self.max_n_components
 
@@ -108,10 +109,10 @@ class SelectorDIC(ModelSelector):
     https://pdfs.semanticscholar.org/ed3d/7c4a5f607201f3848d4c02dd9ba17c791fc2.pdf
     DIC = log(P(X(i)) - 1/(M-1)SUM(log(P(X(all but i))
     '''
-
+    warnings.filterwarnings("ignore", category=RuntimeWarning)
     def select(self):
 
-
+        
         # TODO implement model selection based on DIC scores
         #now look the different initialization. Now bigger DIC better
         best_n, bestDic = self.n_constant,float("-inf")
@@ -146,7 +147,7 @@ class SelectorCV(ModelSelector):
     ''' select best model based on average log Likelihood of cross-validation folds
 
     '''
-
+    warnings.filterwarnings("ignore", category=RuntimeWarning)
     def select(self):
         bestScore=None
         best_n=0
@@ -179,7 +180,12 @@ class SelectorCV(ModelSelector):
                     best_n = n
             except:
                 pass
-        model=GaussianHMM(n_components=best_n,covariance_type="diag",n_iter=1000,random_state=self.random_state,verbose=False).fit(self.X,self.lengths)
+        if best_n==0:
+            model=GaussianHMM(n_components=self.n_constant,covariance_type="diag",n_iter=1000,random_state=self.random_state,verbose=False).fit(self.X,self.lengths)
+        else:
+            model=GaussianHMM(n_components=best_n,covariance_type="diag",n_iter=1000,random_state=self.random_state,verbose=False).fit(self.X,self.lengths)
+            
+        
         return model
 
 
