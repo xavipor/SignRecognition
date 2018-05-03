@@ -33,7 +33,7 @@ class ModelSelector(object):
 
     def base_model(self, num_states):
         # with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=DeprecationWarning)
+
         # warnings.filterwarnings("ignore", category=RuntimeWarning)
         try:
             hmm_model = GaussianHMM(n_components=num_states, covariance_type="diag", n_iter=1000,
@@ -75,9 +75,28 @@ class SelectorBIC(ModelSelector):
         :return: GaussianHMM object
         """
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+        #The lowest the BIC the better
+        best_n, bestBic = self.n_constant,float("inf")
 
-        # TODO implement model selection based on BIC scores
-        raise NotImplementedError
+        for n in range(self.min_n_components, self.max_n_components + 1):
+            try:
+
+                myModel=self.base_model(n)
+                logLike=myModel.score(self.X,self.lengths)
+                logN = math.log(len(self.sequences))
+                number_features=myModel.n_features
+
+# found in forums, based on means std (free parameters) etc.
+                
+                p = (n**2) + (2 * n *number_features) -1 
+                currentBic = -2 * logLike + p * logN
+
+                if bestBic is None or bestBic > currentBic:
+                    bestBic, best_n = currentBic, n
+            except:
+                pass
+
+        return self.base_model(best_n)
 
 
 class SelectorDIC(ModelSelector):
@@ -91,10 +110,36 @@ class SelectorDIC(ModelSelector):
     '''
 
     def select(self):
-        warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 
         # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+        #now look the different initialization. Now bigger DIC better
+        best_n, bestDic = self.n_constant,float("-inf")
+        currentDic=0.0
+        #We will need to train a model for each word
+
+        for n in range(self.min_n_components, self.max_n_components + 1):
+            try:
+                totalScore=0.0
+                myModel=self.base_model(n)
+                logLike = myModel.score(self.X, self.lengths)
+                #Extracting info from the dictionary
+                for currentWord, (currentX,currentLengths) in self.hwords.items():
+                    if currentWord !=self.this_word:
+                        totalScore+=myModel.score(currentX,currentLengths)
+
+                currentDic= logLike - (totalScore/(len(self.words)-1))
+                #Now the sign change since the bigger dic the better
+                if bestDic is None or bestDic < currentDic:
+                    bestDic, best_n = currentDic, n
+
+
+
+            except:
+                pass
+        return self.base_model(best_n)
+
+
 
 
 class SelectorCV(ModelSelector):
@@ -103,7 +148,48 @@ class SelectorCV(ModelSelector):
     '''
 
     def select(self):
-        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        bestScore=None
+        best_n=0
+       
+        for n in range(self.min_n_components, self.max_n_components + 1):
+            try:
+                totalScore=0.0
+                counter=0
+                currentScore=0.0
+                if (len(self.sequences))>=3:
+                    n_folds=3
+                    split_method = KFold(n_folds)
+                    for trainIdx,testIdx in split_method.split(self.sequences):
+                        xTrain,lenghTrain= combine_sequences(trainIdx, self.sequences)
+                        xTest,lenghTest= combine_sequences(testIdx, self.sequences)
+                        
+                        myModel = GaussianHMM(n_components=n, covariance_type="diag", n_iter=1000,random_state=self.random_state, verbose=False).fit(xTrain, lenghTrain)
+                        totalScore+=myModel.score(xTest,lenghTest)
+                        counter=counter+1
+                        if counter ==0:
+                            currentScore=totalScore/1.0
+                        else:
+                            currentScore=totalScore/counter
+                else:
+                    
+                    myModel=GaussianHMM(n_components=n, covariance_type="diag", n_iter=1000,random_state=self.random_state, verbose=False).fit(self.X, self.lengths)
+                    currentScore=myModel.score(self.X, self.lengths)
+                if bestScore is None or bestScore < currentScore:
+                    bestScore=currentScore
+                    best_n = n
+            except:
+                pass
+        model=GaussianHMM(n_components=best_n,covariance_type="diag",n_iter=1000,random_state=self.random_state,verbose=False).fit(self.X,self.lengths)
+        return model
 
-        # TODO implement model selection using CV
-        raise NotImplementedError
+
+
+                   
+
+
+
+
+
+
+
+        
